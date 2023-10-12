@@ -1,0 +1,535 @@
+﻿
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>Zoom To Fit</title>
+    <link rel="stylesheet" href="http://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.css" type="text/css">
+    <script src="http://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.9/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css?v=8.0.3">
+
+    <style>
+        html, body {
+            height: 100%;
+            padding: 0px;
+            margin: 0px;
+        }
+        .task-near-deadline {
+            background-color: rgb(255, 55, 0); /* Измените цвет, какой вам нужно */
+            color: red; /* Измените цвет текста, какой вам нужно */
+            font-weight: bold; /* Жирный шрифт, чтобы сделать текст более выделенным */
+        }
+        .task-end {
+            background-color: rgb(47, 197, 47); /* Измените цвет, какой вам нужно */
+            color: red; /* Измените цвет текста, какой вам нужно */
+            font-weight: bold; /* Жирный шрифт, чтобы сделать текст более выделенным */
+        }
+        .gantt_cal_ltext textarea{
+            overflow-y: auto;
+            overflow-x: hidden;
+            font-family: Arial;
+            font-size: 13px;
+            box-sizing: border-box;
+            border: 1px solid #cecece;
+            height: 50px;
+            width: 100%;
+            outline: none!important;
+            resize: none;
+        }
+        .gantt_cal_light_wide .gantt_cal_lsection{
+            border: 0;
+            float: left;
+            text-align: left;
+            width: 170px;
+            height: 20px;
+            padding: 5px 10px 0 0;
+        }
+        .gantt_cal_light_wide .gantt_wrap_section {
+            position: relative;
+            padding: 10px 0;
+            overflow: hidden;
+            border-bottom: 1px solid #ebebeb;
+            /* width: 500px; */
+            height: 75px;
+        }
+        .gantt_cal_light_wide .gantt_section_time {
+            overflow: hidden;
+            padding-top: 2px!important;
+            padding-right: 0;
+            height: 40px!important;
+        }
+        .gantt_cal_light_wide .gantt_cal_larea {
+            box-sizing: border-box;
+            border: 1px solid #cecece;
+            height: 840px;
+        }
+        .gantt_cal_light_wide.gantt_cal_light_full {
+            width: 738px;
+            visibility: visible;
+            height: 920px;
+            display: block;
+            top: 14px;
+            left: 628px;
+        }
+        .gantt_modal_box {
+            overflow: hidden;
+            display: inline-block;
+            min-width: 600px;
+            width: 50px;
+            text-align: center;
+            position: fixed;
+            z-index: 20000;
+            box-shadow: 3px 3px 3px rgba(0,0,0,.07);
+            font-family: Arial;
+            border-radius: 6px;
+            border: 1px solid #cecece;
+            background: #fff;
+        }
+        #form_lable {
+            width: 120px;
+        }
+        #form_lable_price {
+            margin-left: 10px;
+        }
+        #form_lable_select {
+            width: 150px;
+        }
+        #form_lable_result {
+            width: 200px;
+        }
+        #platform_cost {
+            width: 415px;
+        }
+        #count, #price {
+            width: 200px;
+        }
+
+        .fa {
+			cursor: pointer;
+			font-size: 14px;
+			text-align: center;
+			opacity: 0.2;
+			padding: 5px;
+		}
+
+		.fa:hover {
+			opacity: 1;
+		}
+
+		.fa-pencil {
+			color: #ffa011;
+		}
+
+		.fa-plus {
+			color: #328EA0;
+		}
+
+		.fa-times {
+			color: red;
+		}
+
+    </style>
+</head>
+<body>
+    <div class="gantt_control">
+        <button class='zoom_toggle' onclick="toggleMode(this)">Zoom to Fit</button>
+        <input type=button value="Zoom In" onclick="zoom_in();">
+        <input type=button value="Zoom Out" onclick="zoom_out();">
+    </div>
+    <div id="gantt_here" style='width:100%; height:calc(100vh - 52px); position: relative;'></div>
+    <script>
+
+
+        function calculatePrice() {
+            // Получаем значения из формы
+            var count = document.getElementById("count").value;
+            var pricePerIcecream = 5000;
+            var extraIcecream = Math.ceil(count / 3);
+            var totalIcecreamCost = extraIcecream * pricePerIcecream;
+
+            // Записываем результат в поле price
+            var priceInput = document.getElementById("price");
+            priceInput.value = totalIcecreamCost;
+        }
+        
+        gantt.plugins({
+            tooltip: true,
+            marker: true,
+        });
+
+        gantt.config.duration_unit = "day";
+        gantt.config.work_time = true;
+        gantt.setWorkTime({
+            days: [0, 1, 2, 3, 4, 5, 6], // Дни недели, в которые работаем (0 - воскресенье, 1 - понедельник, и так далее)
+            hours: { from: 9, to: 18 } // Время начала и окончания рабочего дня
+        });
+        gantt.config.drag_move = false; // Запретить перемещение задачи
+        gantt.config.drag_resize = false; // Запретить изменение даты задачи путем изменения размера
+        gantt.config.drag_progress = false; // Запретить изменение процента выполнения
+        gantt.config.show_progress = false;
+        gantt.config.links = false;
+        gantt.config.drag_links = false;
+        gantt.config.expanded = true;
+
+        var colHeader = '<div class="gantt_grid_head_cell gantt_grid_head_add" onclick="gantt.createTask()"></div>',
+        colContent = function (task) {
+            return ('<i class="fa gantt_button_grid gantt_grid_edit fa-pencil" onclick="clickGridButton(' + task.id + ', \'edit\')"></i>' +
+                '<i class="fa gantt_button_grid gantt_grid_add fa-plus" onclick="clickGridButton(' + task.id + ', \'add\')"></i>' +
+                '<i class="fa gantt_button_grid gantt_grid_delete fa-times" onclick="clickGridButton(' + task.id + ', \'delete\')"></i>' +
+                '<i class="fa gantt_button_grid gantt_grid_delete fa-calculator" onclick="clickGridButton(' + task.id + ', \'price\')"></i>');
+        };
+
+        gantt.config.columns = [
+            {name: "text", tree: true, width: '*', resize: true},
+            {name: "start_date", align: "center", resize: true},
+            {
+                name: "buttons",
+                label: colHeader,
+                width: 95,
+                template: colContent
+            }
+        ];
+
+        function clickGridButton(id, action) {
+            switch (action) {
+                case "edit":
+                    gantt.showLightbox(id);
+                    break;
+                case "add":
+                    gantt.createTask(null, id);
+                    break;
+                case "delete":
+                    gantt.confirm({
+                        title: gantt.locale.labels.confirm_deleting_title,
+                        text: gantt.locale.labels.confirm_deleting,
+                        callback: function (res) {
+                            if (res)
+                                gantt.deleteTask(id);
+                        }
+                    });
+                    break;
+                case "price":
+                    // Открываем модальное окно для расчета стоимости конкурса
+                    var priceModal = gantt.modalbox({
+                        height: 500,
+                        title:"Расчет стоимости",
+                        text: '<form style="text-align: left;">' +
+                            '<div style="margin-top: 5px;">' +
+                                '<label id="form_lable" for="count">Количество ик:</label>' +
+                                '<input type="number" id="count" name="count" value="0" oninput="calculatePrice()">' +
+                                '<label id="form_lable_price" for="price">Цена:</label>' +
+                                '<input type="number" id="price" name="price" value="">' +
+                            '</div>' +
+                            '<div style="margin-top: 5px;">' +
+                                '<label id="form_lable" for="count">Концелярия:</label>' +
+                                '<input type="number" id="count" name="count" value="1" oninput="calculatePrice()">' +
+                                '<label id="form_lable_price" for="price">Цена:</label>' +
+                                '<input type="number" id="price" name="price" value="1000">' +
+                            '</div>' +
+                            '<div style="margin-top: 5px;">' +
+                                '<label id="form_lable" for="count">Доставка:</label>' +
+                                '<input type="number" id="count" name="count" value="1" oninput="calculatePrice()">' +
+                                '<label id="form_lable_price" for="price">Цена:</label>' +
+                                '<input type="number" id="price" name="price" value="3000">' +
+                            '</div>' +
+                            '<div style="margin-top: 5px;">' +
+                                '<label id="form_lable_select" for="platform_cost">Стоимость площадки:</label>' +
+                                '<select id="platform_cost" name="platform_cost">' +
+                                    '<option value="6000">zacupki.ru 6000 рублей</option>' +
+                                    '<option value="9000">sberzacupki.ru 9000 рублей</option>' +
+                                    '<option value="12000">12000 рублей</option>' +
+                                '</select>' +
+                            '</div">' +
+                            '<div style="margin-top: 5px; text-align: left;">' +
+                                '<label class="control control--checkbox"><input type="checkbox"/> Командировка - 10 000 р.' +
+                                '<div class="control__indicator"></div></label></br>' +
+                                '<label class="control control--checkbox"><input type="checkbox"/> Поставка - 30 000 р.' +
+                                '<div class="control__indicator"></div></label></br>' +
+                                '<label class="control control--checkbox"><input type="checkbox"/> ТЗ ТРП - 20 000 р.' +
+                                '<div class="control__indicator"></div></label></br>' +
+                                '<label class="control control--checkbox"><input type="checkbox"/> ППО - 15 000 р.' +
+                                '<div class="control__indicator"></div></label></br>' +
+                                '<label class="control control--checkbox"><input type="checkbox"/> Монт. наладка - 11 000 р.' +
+                                '<div class="control__indicator"></div></label></br>' +
+                                '<label class="control control--checkbox"><input type="checkbox"/> АТС - 12 000 р.' +
+                                '<div class="control__indicator"></div></label></br>' +
+                                '<label class="control control--checkbox"><input type="checkbox"/> ГТП - 13 000 р.' +
+                                '<div class="control__indicator"></div></label>' +
+                            '</div">' +
+                            '<div style="margin-top: 5px; text-align: center;">' +
+                                '<input type="button" value="Рассчитать стоимость" onclick="calculate()">' +
+                            '</div">' +
+                            '<div style="margin-top: 5px; text-align: left;">' +
+                                '<label id="form_lable_result" for="platform_cost">Итоговая цена конкурса:</label>' +
+                                '<input type="text" id="price" name="price" value="">' +
+                            '</div">' +
+                            '<div style="margin-top: 5px; text-align: left;">' +
+                                '<label id="form_lable_result" for="platform_cost">Цена с НДС 20%:</label>' +
+                                '<input type="text" id="price" name="price" value="">' +
+                            '</div">' +
+                            '<div style="margin-top: 5px; text-align: left;">' +
+                                '<label id="form_lable_result" for="platform_cost">Ещё какая-нибудь цена:</label>' +
+                                '<input type="text" id="price" name="price" value="">' +
+                            '</div">' +
+
+  
+                            
+                        '</form>',
+                        
+                        buttons:["Save", "Defaults", "Cancel"],
+                        callback: function(result){
+                            gantt.alert(result);
+                        }
+                    });
+                    
+                    gantt.modalbox.show(priceModal);
+
+                    break;
+            }
+        }
+
+        gantt.templates.tooltip_text = (start, end, task) => {
+            const text = `<b>Название:</b> ${task.text}<br/>`;
+            const name_concurs = task.name_concurs? `<b>Описание:</b> ${task.name_concurs}<br/>` : '';
+            const end_tip = task.end_tip? `<b>Статус:</b> ${task.end_tip}<br/>` : '';
+            const start_date = task.start_date? `<b>Начало:</b> ${gantt.templates.tooltip_date_format(start)}<br/>` : '';
+            const end_date = task.end_date? `<b>Конец:</b> ${gantt.templates.tooltip_date_format(end)}<br/>` : '';
+            const number_proc = task.number_proc? `<b>Номер процедуры:</b> ${task.number_proc}<br/>` : '';
+            const oplata_plo = task.oplata_plo? `<b>Оплата площадки:</b> ${task.oplata_plo}<br/>` : '';
+            const nmck = task.nmck? `<b>НМЦК:</b> ${task.nmck}<br/>` : '';
+            const date_pret = task.date_pret? `<b>Дата преторжки:</b> ${task.date_pret}<br/>` : '';
+            const result = task.result? `<b>Подались / Не подались:</b> ${task.result}<br/>` : '';
+            const price = task.price? `<b>Цена:</b> ${task.price}<br/>` : '';
+            const itog = task.itog? `<b>Итог:</b> ${task.itog}<br/>` : '';
+            const comment = task.comment? `<b>Комментарий:</b> ${task.comment}<br/>` : '';
+
+            return text + name_concurs + end_tip + start_date + end_date + number_proc + oplata_plo + nmck + date_pret + result + price + itog + comment;
+        };
+
+        let showingLightbox = false;
+
+        const mainTaskLightboxConfig = [
+            { name: "custom_section1", height: 40, map_to: "text", type: "textarea", focus: true },
+            { name: "custom_section2", height: 80, map_to: "name_concurs", type: "textarea", focus: false },
+            { name: "custom_section5", height: 80, map_to: "number_proc", type: "textarea", focus: false },
+            { name: "custom_section6", height: 80, map_to: "oplata_plo", type: "textarea", focus: false },
+            { name: "custom_section7", height: 80, map_to: "nmck", type: "textarea", focus: false },
+            { name: "custom_section8", height: 80, map_to: "date_pret", type: "textarea", focus: false },
+            { name: "custom_section9", height: 80, map_to: "result", type: "textarea", focus: false },
+            { name: "custom_section10", height: 80, map_to: "price", type: "textarea", focus: false },
+            { name: "custom_section11", height: 80, map_to: "itog", type: "textarea", focus: false },
+            {name:"time", height:80, map_to:"auto", type:"time"},
+            { name: "custom_section3", height: 80, map_to: "link", type: "textarea", focus: false },
+            { name: "custom_section4", height: 80, map_to: "comment", type: "textarea", focus: false },
+            
+        // Добавьте другие секции, если необходимо
+        ];
+
+        const categoryOptions = [
+            { key: "Подача документов", label: "Подача документов" },
+            { key: "Оплата", label: "Оплата" },
+            { key: "Дата переторжки", label: "Дата переторжки" },
+            { key: "Публикация решения", label: "Публикация решения" },
+            { key: "Повторная подача документов", label: "Повторная подача документов" },
+            // Другие опции
+        ];
+
+        const categoryOptions2 = [
+            { key: "В работе", label: "В работе" },
+            { key: "Завершено", label: "Завершено" },
+            // Другие опции
+        ];
+
+        const subTaskLightboxConfig = [
+            { name: "custom_section1", height: 25, map_to: "text", type: "select", options: categoryOptions },
+            { name: "custom_section12", height: 25, map_to: "end_tip", type: "select", options: categoryOptions2 },
+            { name: "custom_section2", height: 80, map_to: "name_concurs", type: "textarea", focus: false },
+            {name:"time", height:80, map_to:"auto", type:"time"},
+            { name: "custom_section4", height: 80, map_to: "comment", type: "textarea", focus: false },
+        ];
+
+
+        var dateToStr = gantt.date.date_to_str(gantt.config.task_date);
+        var markerId = gantt.addMarker({  
+            start_date: new Date(), 
+            css: "today", 
+            text: "Сегодня", 
+            title: dateToStr(new Date()) 
+        });
+        gantt.getMarker(markerId);
+
+        gantt.i18n.setLocale("ru");
+        gantt.locale.labels.section_custom_section1 = "Заказчик";
+        gantt.locale.labels.section_custom_section2 = "Описание";
+        gantt.locale.labels.section_custom_section3 = "Ссылка на конкурс";
+        gantt.locale.labels.section_custom_section4 = "Комментарий";
+        gantt.locale.labels.section_custom_section5 = "Номер процедуры:";
+        gantt.locale.labels.section_custom_section6 = "Оплата площадки:";
+        gantt.locale.labels.section_custom_section7 = "НМЦК:";
+        gantt.locale.labels.section_custom_section8 = "Дата преторжки:";
+        gantt.locale.labels.section_custom_section9 = "Подались / Не подались";
+        gantt.locale.labels.section_custom_section10 = "Цена:";
+        gantt.locale.labels.section_custom_section11 = "Итог:";
+        gantt.locale.labels.section_custom_section12 = "Статус:";
+
+
+        gantt.attachEvent("onLightboxSave", function (id, task, is_new) {
+            // Получите значение из селекта в lightbox
+            const selectValue = gantt.getLightboxSection("time").getValue();
+                const endDate = new Date(task.end_date);
+                endDate.setHours(23, 59);
+                task.end_date = endDate;
+
+            var id = task.id;
+            var text = task.text;
+            var number_proc = task.number_proc;
+            var oplata_plo = task.oplata_plo;
+            var nmck = task.nmck;
+            var date_pret = task.date_pret;
+            var result = task.result;
+            var price = task.price;
+            var itog = task.itog;
+            var start_date = task.start_date;
+            var end_date = task.end_date;
+            var progress = task.progress;
+            var open = task.open;
+            var name_concurs = task.name_concurs;
+            var link = task.link;
+            var comment = task.comment;
+            var parent = task.parent;
+            var endtip = task.end_tip;
+
+            $.ajax({
+                async: false,
+                url: "/Gantt/SaveGanttData",
+                method: 'POST',
+                dataType: "json",
+                data: {id, text, number_proc, oplata_plo, nmck, date_pret, result, price, itog, start_date, end_date, progress, open, name_concurs, link, comment, parent, endtip},    // перенос перемнной в контроллер
+                //data: { data: task },
+                success: function (response) {
+
+                },
+            });
+            gantt.render();
+            return true;
+        });
+
+        gantt.templates.task_class = function (start, end, task) {
+            const endDate = new Date(end);
+            const currentDate = new Date();
+            const timeDifference = endDate - currentDate;
+
+            var end_tip = task.end_tip;
+            var time_end = "";
+
+            
+
+            if (timeDifference < (172800000) && end_tip === "В работе") { // 86400000 миллисекунд в 24 часах
+                //alert(end_tip);
+                return "task-near-deadline"; // Возвращает класс для выделения
+            }
+            
+            if (end_tip === "Завершено") { // 86400000 миллисекунд в 24 часах
+                return "task-end"; // Возвращает класс для выделения
+            }
+            return ""; // Возвращает пустую строку, если класс не нужен
+        };
+
+        // Устанавливаем флаг для определения типа задачи
+        gantt.attachEvent("onBeforeLightbox", (id) => {
+            const task = gantt.getTask(id);
+            
+            if (task.parent === "0" || task.parent === 0) {
+                // Главная задача
+                gantt.config.lightbox.sections = mainTaskLightboxConfig;
+            } else {
+                // Подзадача
+                gantt.config.lightbox.sections = subTaskLightboxConfig;
+            }
+
+            gantt.resetLightbox();
+
+            return true;
+        });
+
+        // Обработчик события добавления задачи
+        gantt.attachEvent("onAfterTaskAdd", function(id, task) {
+        // Перерисовываем график
+            gantt.render();
+        });
+
+        // Обработчик события удаления задачи
+        gantt.attachEvent("onAfterTaskDelete", function(id, task) {
+            // Отправляем AJAX-запрос на сервер для удаления элемента
+            $.ajax({
+                url: "/Gantt/GanttGeleteData",
+                type: "GET",
+                data: {id},
+                success: function(response) {
+                    gantt.render();
+                },
+            });
+        });
+
+        
+        $.ajax({
+            async: false,
+            url: "/Gantt/GanttGetData",
+            method: 'GET',
+            dataType: "json",
+            data: {},    // перенос перемнной в контроллер
+			success: function (response) {
+                gantt.init("gantt_here");
+
+                var data = response;
+                var data = JSON.parse(data);
+                var tasks = [];
+                for (var i = 0; i < data.length; i++) {
+                    var task = {
+                        "id": data[i].id,
+                        "text": data[i].text,
+                        "number_proc": data[i].number_proc,
+                        "oplata_plo": data[i].oplata_plo,
+                        "nmck": data[i].nmck,
+                        "date_pret": data[i].date_pret,
+                        "result": data[i].result,
+                        "price": data[i].price,
+                        "itog": data[i].itog,
+                        "start_date": data[i].start_date,
+                        "end_date": data[i].end_date,
+                        "progress": data[i].progress,
+                        "open": data[i].open,
+                        "name_concurs": data[i].name_concurs,
+                        "link": data[i].link,
+                        "comment": data[i].comment,
+                        "parent": data[i].parent? data[i].parent : 0,
+                        "end_tip": data[i].endtip,
+                    };
+                    tasks.push(task);
+                }
+                gantt.parse({"data": tasks});
+                gantt.eachTask(function(task) {
+                    gantt.open(task.id);
+                });
+                
+			},
+		});
+
+    </script>
+
+    <script>
+        (function (i, s, o, g, r, a, m) {
+            i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
+                (i[r].q = i[r].q || []).push(arguments)
+            }, i[r].l = 1 * new Date(); a = s.createElement(o),
+                m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
+        })(window, document, 'script', '//www.google-analytics.com/analytics.js', 'ga');
+
+        ga('create', 'UA-11031269-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <script src="https://cdn.ravenjs.com/3.10.0/raven.min.js"></script>
+    <script>Raven.config('https://25a6d5e8c35148d195a1967d8374ffca@sentry.dhtmlx.ru/6').install()</script>
+</body>
